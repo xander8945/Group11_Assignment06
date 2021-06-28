@@ -1,0 +1,155 @@
+#include <iostream>
+#include <queue>
+#include <string>
+#include <ctime>
+#include <thread>
+#include <mutex>
+#include <chrono>
+
+std::mutex mtx;
+
+class Item
+{
+public:
+    std::string producerName;
+    int itemID;
+    Item(std::string name, int id);
+    int getID();
+    std::string getProducer();
+};
+
+Item::Item(std::string name, int id)
+{
+    producerName = name;
+    itemID = id;
+}
+
+int Item::getID()
+{
+    return itemID;
+}
+
+std::string Item::getProducer()
+{
+    return producerName;
+}
+
+class ItemQueue
+{
+public:
+    ItemQueue();
+    int length();
+    void put(Item *);
+    Item *take();
+    std::queue<Item *> stock;
+};
+
+ItemQueue::ItemQueue()
+{
+}
+
+int ItemQueue::length()
+{
+    return stock.size();
+}
+
+void ItemQueue::put(Item *item)
+{
+    stock.push(item);
+}
+
+Item *ItemQueue::take()
+{
+    Item *item = stock.front();
+    stock.pop();
+    return item;
+}
+
+class Producer
+{
+public:
+    Producer(std::string producerName, ItemQueue *queue);
+    void produce();
+    ItemQueue *itemQueue;
+    std::string name;
+    int itemID;
+};
+
+Producer::Producer(std::string producerName, ItemQueue *queue)
+{
+    std::cout << "I am a producer named: " << producerName << std::endl;
+    name = producerName;
+    itemQueue = queue;
+}
+
+void Producer::produce()
+{
+    itemID = rand() % 100 + 1;
+    Item *item = new Item(name, itemID);
+    std::unique_lock<std::mutex> lck(mtx, std::defer_lock);
+    lck.lock();
+    itemQueue->put(item);
+    lck.unlock();
+}
+
+class Consumer
+{
+public:
+    Consumer(std::string consumerID, ItemQueue *queue);
+    void consume();
+    ItemQueue *itemQueue;
+    std::string ID;
+};
+
+Consumer::Consumer(std::string consumerID, ItemQueue *queue)
+{
+    std::cout << "I am a consumer with ID: " << consumerID << std::endl;
+    ID = consumerID;
+    itemQueue = queue;
+}
+
+void Consumer::consume()
+{
+    std::unique_lock<std::mutex> lck(mtx, std::defer_lock);
+    lck.lock();
+    if (itemQueue->length() != 0)
+    {
+        Item *item = itemQueue->take();
+        std::cout << ID << " consumed an item from " << item->getProducer() << " with item ID " << item->getID() << std::endl;
+    }
+    lck.unlock();
+}
+
+int main()
+{
+    srand(time(0));
+    ItemQueue queue = ItemQueue();
+    Producer *producer1Ptr = new Producer("Producer1", &queue);
+    Producer *producer2Ptr = new Producer("Producer2", &queue);
+
+    Producer *producer3Ptr = new Producer("Producer3", &queue);
+
+    Consumer *consumer1Ptr = new Consumer("Consumer1", &queue);
+    Consumer *consumer2Ptr = new Consumer("Consumer2", &queue);
+    Consumer *consumer3Ptr = new Consumer("Consumer3", &queue);
+    while (true)
+    {
+        std::thread producer1(&Producer::produce, producer1Ptr);
+        std::thread producer2(&Producer::produce, producer2Ptr);
+        std::thread producer3(&Producer::produce, producer3Ptr);
+        std::chrono::milliseconds timespan(1000);
+        std::this_thread::sleep_for(timespan);
+        std::thread consumer1(&Consumer::consume, consumer1Ptr);
+        std::thread consumer2(&Consumer::consume, consumer2Ptr);
+        std::thread consumer3(&Consumer::consume, consumer3Ptr);
+        producer1.join();
+        producer2.join();
+        producer3.join();
+        consumer1.join();
+        consumer2.join();
+        consumer3.join();
+        std::cout << std::endl;
+    }
+    delete producer1Ptr, producer2Ptr, consumer1Ptr, consumer2Ptr, consumer3Ptr;
+    return 0;
+}
