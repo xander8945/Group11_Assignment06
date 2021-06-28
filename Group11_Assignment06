@@ -116,6 +116,7 @@ void Consumer::consume()
     {
         Item *item = itemQueue->take();
         std::cout << ID << " consumed an item from " << item->getProducer() << " with item ID " << item->getID() << std::endl;
+        delete item;
     }
     lck.unlock();
 }
