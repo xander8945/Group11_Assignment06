@@ -5,11 +5,10 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
-
 std::mutex mtx;
 
-class Item
-{
+    //item class created
+class Item{
 public:
     std::string producerName;
     int itemID;
@@ -18,24 +17,23 @@ public:
     std::string getProducer();
 };
 
-Item::Item(std::string name, int id)
-{
+
+Item::Item(std::string name, int id){
     producerName = name;
     itemID = id;
 }
+    //end of item class
 
-int Item::getID()
-{
+
+int Item::getID(){
     return itemID;
 }
-
-std::string Item::getProducer()
-{
+std::string Item::getProducer(){
     return producerName;
 }
 
-class ItemQueue
-{
+    //the item queue used for the item and ID
+class ItemQueue{
 public:
     ItemQueue();
     int length();
@@ -44,29 +42,24 @@ public:
     std::queue<Item *> stock;
 };
 
-ItemQueue::ItemQueue()
-{
+ItemQueue::ItemQueue(){
 }
-
-int ItemQueue::length()
-{
+int ItemQueue::length(){
     return stock.size();
 }
-
-void ItemQueue::put(Item *item)
-{
+void ItemQueue::put(Item *item){
     stock.push(item);
 }
-
-Item *ItemQueue::take()
-{
+Item *ItemQueue::take(){
     Item *item = stock.front();
     stock.pop();
     return item;
 }
+    //end of item queue
 
-class Producer
-{
+
+    //producer class
+class Producer{
 public:
     Producer(std::string producerName, ItemQueue *queue);
     void produce();
@@ -75,15 +68,14 @@ public:
     int itemID;
 };
 
-Producer::Producer(std::string producerName, ItemQueue *queue)
-{
+Producer::Producer(std::string producerName, ItemQueue *queue){
     std::cout << "I am a producer named: " << producerName << std::endl;
     name = producerName;
     itemQueue = queue;
 }
 
-void Producer::produce()
-{
+    //produces from produce class
+void Producer::produce(){
     itemID = rand() % 100 + 1;
     Item *item = new Item(name, itemID);
     std::unique_lock<std::mutex> lck(mtx, std::defer_lock);
@@ -91,9 +83,10 @@ void Producer::produce()
     itemQueue->put(item);
     lck.unlock();
 }
+    //end of producer class
 
-class Consumer
-{
+    //beginning of consumer class
+class Consumer{
 public:
     Consumer(std::string consumerID, ItemQueue *queue);
     void consume();
@@ -101,51 +94,54 @@ public:
     std::string ID;
 };
 
-Consumer::Consumer(std::string consumerID, ItemQueue *queue)
-{
+Consumer::Consumer(std::string consumerID, ItemQueue *queue){
     std::cout << "I am a consumer with ID: " << consumerID << std::endl;
     ID = consumerID;
     itemQueue = queue;
 }
 
-void Consumer::consume()
-{
+    //consumes from consumer class
+void Consumer::consume(){
     std::unique_lock<std::mutex> lck(mtx, std::defer_lock);
     lck.lock();
-    if (itemQueue->length() != 0)
-    {
+    if (itemQueue->length() != 0){
         Item *item = itemQueue->take();
         std::cout << ID << " consumed an item from " << item->getProducer() << " with item ID " << item->getID() << std::endl;
         delete item;
     }
     lck.unlock();
 }
+    //end of consumer class
 
-int main()
-{
+int main(){
+    //uses random time to generate random item ID for 
     srand(time(0));
     ItemQueue queue = ItemQueue();
-    Producer *producer1Ptr = new Producer("Producer1", &queue);
+    Producer *producer1Ptr = new Producer("Producer1", &queue); // producer class producers pointer and sets it as the new producer item from queue
     Producer *producer2Ptr = new Producer("Producer2", &queue);
-
     Producer *producer3Ptr = new Producer("Producer3", &queue);
 
-    Consumer *consumer1Ptr = new Consumer("Consumer1", &queue);
+    Consumer *consumer1Ptr = new Consumer("Consumer1", &queue); // consumer class consumer pointer and sets it as the new consumer item from queue
     Consumer *consumer2Ptr = new Consumer("Consumer2", &queue);
     Consumer *consumer3Ptr = new Consumer("Consumer3", &queue);
-    while (true)
-    {
-        std::thread producer1(&Producer::produce, producer1Ptr);
+    
+    //while loop to repeat 3 producer and consumers 
+    while (true){   
+        std::thread producer1(&Producer::produce, producer1Ptr);    //threads grab the items from the producers and consumers
         std::thread producer2(&Producer::produce, producer2Ptr);
         std::thread producer3(&Producer::produce, producer3Ptr);
-        std::chrono::milliseconds timespan(1000);
+        
+        std::chrono::milliseconds timespan(1000);   //allow thread to sleep and wait after producing the item ID's
         std::this_thread::sleep_for(timespan);
-        std::thread consumer1(&Consumer::consume, consumer1Ptr);
+        
+        std::thread consumer1(&Consumer::consume, consumer1Ptr);    
         std::thread consumer2(&Consumer::consume, consumer2Ptr);
         std::thread consumer3(&Consumer::consume, consumer3Ptr);
-        producer1.join();
+        
+        producer1.join();       //allows repeation of creating and destroying threads
         producer2.join();
         producer3.join();
+        
         consumer1.join();
         consumer2.join();
         consumer3.join();
